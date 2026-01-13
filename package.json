@@ -1,0 +1,26 @@
+{
+  "name": "uxtest-platform",
+  "version": "1.0.0",
+  "description": "Privacy-first UX testing platform with embeddable SDK",
+  "private": true,
+  "workspaces": [
+    "sdk",
+    "backend",
+    "dashboard"
+  ],
+  "scripts": {
+    "sdk:build": "npm run build --workspace=sdk",
+    "backend:dev": "npm run dev --workspace=backend",
+    "backend:start": "npm run start --workspace=backend",
+    "dashboard:dev": "npm run dev --workspace=dashboard",
+    "dashboard:build": "npm run build --workspace=dashboard",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run dashboard:dev\"",
+    "setup": "npm install && npm run sdk:build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

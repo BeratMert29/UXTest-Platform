@@ -1,0 +1,17 @@
+{
+  "name": "@uxtest/backend",
+  "version": "1.0.0",
+  "description": "UX testing backend API",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "sql.js": "^1.10.0",
+    "uuid": "^9.0.1"
+  }
+}

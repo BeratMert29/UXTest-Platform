@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UXTest SDK Demo - Checkout Flow</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 480px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .header h1 {
+      font-size: 1.75rem;
+      color: #1a1a2e;
+      margin-bottom: 0.5rem;
+    }
+    
+    .header p {
+      color: #666;
+      font-size: 0.9rem;
+    }
+    
+    .task-banner {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .task-banner strong {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.5rem;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .form-group input.error {
+      border-color: #ef4444;
+    }
+    
+    .error-message {
+      color: #ef4444;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+    
+    .error-message.visible {
+      display: block;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1rem;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+      margin-top: 0.75rem;
+    }
+    
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+    
+    .success-message {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+    }
+    
+    .success-message.visible {
+      display: block;
+    }
+    
+    .success-message .icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+    
+    .success-message h2 {
+      color: #10b981;
+      margin-bottom: 0.5rem;
+    }
+    
+    .success-message p {
+      color: #666;
+    }
+    
+    .form-container.hidden {
+      display: none;
+    }
+    
+    .debug-panel {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: #1a1a2e;
+      color: #10b981;
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      max-width: 300px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+    
+    .debug-panel h4 {
+      color: #f59e0b;
+      margin-bottom: 0.5rem;
+      font-size: 0.8rem;
+    }
+    
+    .debug-panel .event {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid #333;
+    }
+    
+    .debug-panel .event:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🛒 Checkout</h1>
+      <p>Complete your purchase</p>
+    </div>
+    
+    <div class="task-banner">
+      <strong>📋 UX Test Task</strong>
+      Complete the checkout form and click "Place Order"
+    </div>
+    
+    <div class="form-container" id="form-container">
+      <form id="checkout-form">
+        <div class="form-group">
+          <label for="card-number">Card Number</label>
+          <input type="text" id="card-number" placeholder="4242 4242 4242 4242" maxlength="19">
+          <div class="error-message" id="card-error">Please enter a valid card number</div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="expiry">Expiry Date</label>
+            <input type="text" id="expiry" placeholder="MM/YY" maxlength="5">
+            <div class="error-message" id="expiry-error">Invalid expiry date</div>
+          </div>
+          <div class="form-group">
+            <label for="cvv">CVV</label>
+            <input type="text" id="cvv" placeholder="123" maxlength="4">
+            <div class="error-message" id="cvv-error">Invalid CVV</div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="name">Name on Card</label>
+          <input type="text" id="name" placeholder="John Doe">
+          <div class="error-message" id="name-error">Please enter cardholder name</div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Place Order — $49.99</button>
+        <button type="button" class="btn btn-secondary" id="abandon-btn">Cancel Order</button>
+      </form>
+    </div>
+    
+    <div class="success-message" id="success-message">
+      <div class="icon">✅</div>
+      <h2>Order Placed!</h2>
+      <p>Thank you for your purchase.</p>
+      <button class="btn btn-primary" style="margin-top: 1.5rem" onclick="location.reload()">
+        Start New Test
+      </button>
+    </div>
+  </div>
+  
+  <div class="debug-panel">
+    <h4>🔍 UXTest Events</h4>
+    <div id="transport-info" style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #333; color: #06b6d4;"></div>
+    <div id="event-log">Initializing...</div>
+    <div id="queue-status" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #333; color: #94a3b8;"></div>
+  </div>
+  
+  <!-- Load SDK from local build -->
+  <script src="../sdk/dist/uxtest.min.js"></script>
+  
+  <script>
+    // Get variant from URL (?variant=B) or default to A
+    const urlParams = new URLSearchParams(window.location.search);
+    const variant = urlParams.get('variant') || 'A';
+    
+    // Initialize UXTest SDK
+    UXTest.init({
+      projectId: 'demo-project',
+      testId: 'test-checkout',
+      variant: variant,
+      endpoint: 'http://localhost:3001',
+      batchSize: 3,
+      flushInterval: 5000
+    });
+    
+    // Debug logger
+    const eventLog = document.getElementById('event-log');
+    const events = [];
+    
+    function logDebug(type, payload) {
+      events.unshift({ type, time: new Date().toLocaleTimeString() });
+      eventLog.innerHTML = events.slice(0, 5).map(e => 
+        `<div class="event">${e.time} — ${e.type}</div>`
+      ).join('');
+    }
+    
+    logDebug('task_started');
+    
+    // Show transport info
+    document.getElementById('transport-info').textContent = 
+      'Transport: ' + UXTest.getTransport();
+    
+    // Update queue status periodically
+    setInterval(function() {
+      document.getElementById('queue-status').textContent = 
+        'Queue: ' + UXTest.getQueueLength() + ' events';
+    }, 1000);
+    
+    // Form elements
+    const form = document.getElementById('checkout-form');
+    const formContainer = document.getElementById('form-container');
+    const successMessage = document.getElementById('success-message');
+    const abandonBtn = document.getElementById('abandon-btn');
+    
+    // Input elements
+    const cardInput = document.getElementById('card-number');
+    const expiryInput = document.getElementById('expiry');
+    const cvvInput = document.getElementById('cvv');
+    const nameInput = document.getElementById('name');
+    
+    // Format card number with spaces
+    cardInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+      let formatted = value.match(/.{1,4}/g)?.join(' ') || '';
+      e.target.value = formatted;
+    });
+    
+    // Format expiry date
+    expiryInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.length >= 2) {
+        value = value.slice(0, 2) + '/' + value.slice(2);
+      }
+      e.target.value = value;
+    });
+    
+    // Validate CVV (numbers only)
+    cvvInput.addEventListener('input', function(e) {
+      e.target.value = e.target.value.replace(/\D/g, '');
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      let hasErrors = false;
+      
+      // Validate card number (simple check: 16 digits)
+      const cardNum = cardInput.value.replace(/\s/g, '');
+      if (cardNum.length !== 16) {
+        cardInput.classList.add('error');
+        document.getElementById('card-error').classList.add('visible');
+        UXTest.logEvent('validation_error', { field: 'card_number' });
+        logDebug('validation_error');
+        hasErrors = true;
+      } else {
+        cardInput.classList.remove('error');
+        document.getElementById('card-error').classList.remove('visible');
+      }
+      
+      // Validate expiry
+      const expiry = expiryInput.value;
+      if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+        expiryInput.classList.add('error');
+        document.getElementById('expiry-error').classList.add('visible');
+        UXTest.logEvent('validation_error', { field: 'expiry' });
+        logDebug('validation_error');
+        hasErrors = true;
+      } else {
+        expiryInput.classList.remove('error');
+        document.getElementById('expiry-error').classList.remove('visible');
+      }
+      
+      // Validate CVV
+      if (cvvInput.value.length < 3) {
+        cvvInput.classList.add('error');
+        document.getElementById('cvv-error').classList.add('visible');
+        UXTest.logEvent('validation_error', { field: 'cvv' });
+        logDebug('validation_error');
+        hasErrors = true;
+      } else {
+        cvvInput.classList.remove('error');
+        document.getElementById('cvv-error').classList.remove('visible');
+      }
+      
+      // Validate name
+      if (nameInput.value.trim().length < 2) {
+        nameInput.classList.add('error');
+        document.getElementById('name-error').classList.add('visible');
+        UXTest.logEvent('validation_error', { field: 'name' });
+        logDebug('validation_error');
+        hasErrors = true;
+      } else {
+        nameInput.classList.remove('error');
+        document.getElementById('name-error').classList.remove('visible');
+      }
+      
+      if (hasErrors) {
+        return;
+      }
+      
+      // Log form submission attempt
+      UXTest.logEvent('form_submit', { formId: 'checkout' });
+      logDebug('form_submit');
+      
+      // Simulate API call
+      setTimeout(() => {
+        // Randomly simulate API error (20% chance) for testing
+        if (Math.random() < 0.2) {
+          UXTest.logEvent('api_error', { 
+            endpoint: '/checkout',
+            status: 500 
+          });
+          logDebug('api_error');
+          alert('Payment failed. Please try again.');
+          return;
+        }
+        
+        // Success!
+        formContainer.classList.add('hidden');
+        successMessage.classList.add('visible');
+        
+        // Mark task as complete
+        UXTest.success({ orderId: 'ORD-' + Date.now() });
+        logDebug('task_completed');
+      }, 1000);
+    });
+    
+    // Abandon button
+    abandonBtn.addEventListener('click', function() {
+      if (confirm('Are you sure you want to cancel?')) {
+        UXTest.abandon('user_cancelled');
+        logDebug('task_abandoned');
+        alert('Test abandoned. Refresh to start over.');
+      }
+    });
+    
+    // Track input focus (without capturing values)
+    [cardInput, expiryInput, cvvInput, nameInput].forEach(input => {
+      input.addEventListener('focus', () => {
+        UXTest.logEvent('field_focus', { field: input.id });
+        logDebug('field_focus');
+      });
+    });
+  </script>
+</body>
+</html>

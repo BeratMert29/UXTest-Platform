@@ -1,0 +1,17 @@
+{
+  "name": "@uxtest/sdk",
+  "version": "1.0.0",
+  "description": "Embeddable UX testing SDK",
+  "main": "dist/uxtest.min.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.8"
+  },
+  "files": [
+    "dist"
+  ]
+}

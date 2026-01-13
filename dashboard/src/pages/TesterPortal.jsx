@@ -41,14 +41,16 @@ function TesterPortal() {
         <div className="loading"><div className="spinner" /></div>
       ) : !selectedTest ? (
         <div className="test-list">
-          {tests.length === 0 ? (
+              {tests.length === 0 ? (
             <p className="empty">No active tests available</p>
           ) : tests.map(test => (
             <div key={test.id} className="test-item" onClick={() => handleStart(test)}>
               <div>
                 <h3>{test.name}</h3>
                 <p>{test.description}</p>
-                {test.targetUrl && <span className="url">{new URL(test.targetUrl).hostname}</span>}
+                <div className="test-meta">
+                  {test.targetUrl && <span className="url">{new URL(test.targetUrl).hostname}</span>}
+                </div>
               </div>
               <button className="start-btn">Start →</button>
             </div>

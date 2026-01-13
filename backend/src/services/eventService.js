@@ -9,8 +9,8 @@ export async function processBatch(events) {
   
   for (const event of events) {
     try {
-      // Extract session metadata from task_started events
-      if (event.type === 'task_started') {
+      // Create session on test_started or task_started
+      if (event.type === 'test_started' || event.type === 'task_started') {
         const payload = event.payload || {};
         const timestamp = Math.floor(event.timestamp / 1000);
         
@@ -46,17 +46,22 @@ export async function processBatch(events) {
       ]);
       
       // Update session on completion or abandonment
-      if (event.type === 'task_completed' || event.type === 'task_abandoned') {
-        const outcome = event.type === 'task_completed' ? 'completed' : 'abandoned';
+      if (event.type === 'test_completed' || event.type === 'task_completed') {
         const timestamp = Math.floor(event.timestamp / 1000);
-        
         db.run(`
           UPDATE sessions 
-          SET ended_at = datetime(?, 'unixepoch'),
-              outcome = ?,
-              duration_ms = ?
+          SET ended_at = datetime(?, 'unixepoch'), outcome = 'completed', duration_ms = ?
           WHERE id = ?
-        `, [timestamp, outcome, event.duration || null, event.sessionId]);
+        `, [timestamp, event.duration || null, event.sessionId]);
+      }
+      
+      if (event.type === 'test_abandoned' || event.type === 'task_abandoned') {
+        const timestamp = Math.floor(event.timestamp / 1000);
+        db.run(`
+          UPDATE sessions 
+          SET ended_at = datetime(?, 'unixepoch'), outcome = 'abandoned', duration_ms = ?
+          WHERE id = ?
+        `, [timestamp, event.duration || null, event.sessionId]);
       }
       
       results.processed++;

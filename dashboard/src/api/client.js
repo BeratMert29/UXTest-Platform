@@ -6,12 +6,12 @@
  * - Background refresh
  */
 
-// Use environment variable or auto-detect based on hostname
-const API_BASE = import.meta.env.VITE_API_URL || (
-  window.location.hostname === 'localhost' 
-    ? 'http://localhost:3001'
-    : 'https://uxtest-backend.onrender.com'
-);
+// Backend URL
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001'
+  : 'https://uxtest-backend.onrender.com';
+
+console.log('[API] Using backend:', API_BASE);
 const CACHE_TTL = 30000; // 30 seconds cache
 const REQUEST_TIMEOUT = 10000; // 10 seconds timeout
 

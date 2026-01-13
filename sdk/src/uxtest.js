@@ -71,8 +71,16 @@
     queue = [];
     
     return ajax(config.endpoint + '/events', 'POST', { events: events })
-      .then(function() { clearQueue(); })
-      .catch(function() { queue = events.concat(queue); persistQueue(); });
+      .then(function() { 
+        clearQueue();
+        console.log('[UXTest] Events sent successfully:', events.length);
+      })
+      .catch(function(err) { 
+        queue = events.concat(queue); 
+        persistQueue();
+        console.warn('[UXTest] Failed to send events:', err.message);
+        console.warn('[UXTest] Events queued for retry. If testing on HTTPS site, you need HTTPS backend or use ngrok.');
+      });
   }
 
   function enqueue(type, payload, duration) {

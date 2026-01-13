@@ -34,8 +34,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve SDK file
-app.use('/sdk', express.static(join(__dirname, '../../sdk/dist')));
+// Serve SDK file (from local dev or copied public folder)
+const sdkPaths = [
+  join(__dirname, '../public/sdk'),  // Production (copied files)
+  join(__dirname, '../../sdk/dist')   // Development (direct source)
+];
+for (const p of sdkPaths) {
+  app.use('/sdk', express.static(p));
+}
 
 // Routes
 app.use('/events', eventsRouter);

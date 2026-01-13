@@ -9,8 +9,8 @@ export async function processBatch(events) {
   
   for (const event of events) {
     try {
-      // Create session on test_started or task_started
-      if (event.type === 'test_started' || event.type === 'task_started') {
+      // Create session on test_started
+      if (event.type === 'test_started') {
         const payload = event.payload || {};
         const timestamp = Math.floor(event.timestamp / 1000);
         
@@ -31,6 +31,7 @@ export async function processBatch(events) {
             payload.screenHeight || null,
             payload.language || null
           ]);
+          console.log('[Events] New session:', event.sessionId);
         }
       }
       
@@ -45,27 +46,31 @@ export async function processBatch(events) {
         event.timestamp
       ]);
       
-      // Update session on completion or abandonment
-      if (event.type === 'test_completed' || event.type === 'task_completed') {
+      // Update session ONLY on final test_completed (not task_completed)
+      if (event.type === 'test_completed') {
         const timestamp = Math.floor(event.timestamp / 1000);
         db.run(`
           UPDATE sessions 
           SET ended_at = datetime(?, 'unixepoch'), outcome = 'completed', duration_ms = ?
           WHERE id = ?
         `, [timestamp, event.duration || null, event.sessionId]);
+        console.log('[Events] Session completed:', event.sessionId, 'duration:', event.duration);
       }
       
-      if (event.type === 'test_abandoned' || event.type === 'task_abandoned') {
+      // Update session on abandonment
+      if (event.type === 'test_abandoned') {
         const timestamp = Math.floor(event.timestamp / 1000);
         db.run(`
           UPDATE sessions 
           SET ended_at = datetime(?, 'unixepoch'), outcome = 'abandoned', duration_ms = ?
           WHERE id = ?
         `, [timestamp, event.duration || null, event.sessionId]);
+        console.log('[Events] Session abandoned:', event.sessionId);
       }
       
       results.processed++;
     } catch (error) {
+      console.error('[Events] Error:', error.message);
       results.errors.push({
         sessionId: event.sessionId,
         type: event.type,

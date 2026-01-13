@@ -4,7 +4,7 @@ import { getTests, getTest } from '../api/client';
 // Configure this to your deployed backend URL
 const DEFAULT_BACKEND = window.location.hostname === 'localhost' 
   ? 'http://localhost:3001'
-  : window.UXTEST_BACKEND || 'https://your-backend.onrender.com'; // Change this after deployment
+  : window.UXTEST_BACKEND || 'https://uxtest-backend.onrender.com';
 
 function TesterPortal() {
   const [tests, setTests] = useState([]);

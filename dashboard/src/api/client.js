@@ -10,7 +10,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || (
   window.location.hostname === 'localhost' 
     ? 'http://localhost:3001'
-    : 'https://your-backend.onrender.com' // Change after deployment
+    : 'https://uxtest-backend.onrender.com'
 );
 const CACHE_TTL = 30000; // 30 seconds cache
 const REQUEST_TIMEOUT = 10000; // 10 seconds timeout

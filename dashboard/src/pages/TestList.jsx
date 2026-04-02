@@ -4,12 +4,12 @@ import { usePolling } from '../hooks/usePolling';
 
 function TestList() {
   const navigate = useNavigate();
-  
+
   const { data: tests, loading, error, refresh } = usePolling(
     () => getTests(),
     { interval: 30000 }
   );
-  
+
   return (
     <div>
       <div className="page-header">
@@ -24,7 +24,7 @@ function TestList() {
           </div>
         </div>
       </div>
-      
+
       {loading ? (
         <div className="loading">
           <div className="loading-spinner" />
@@ -43,41 +43,42 @@ function TestList() {
       ) : (
         <div className="test-grid">
           {tests.map(test => (
-            <div key={test.id} className="card test-card" onClick={() => navigate(`/test/${test.id}`)}>
+            <div key={test.id} className="test-card" onClick={() => navigate(`/test/${test.id}`)}>
               <div className="card-header">
                 <div>
                   <h3 className="card-title">{test.name}</h3>
                   <p className="card-description">{test.description}</p>
                 </div>
                 <span className={`status-badge ${test.isActive ? 'active' : 'inactive'}`}>
+                  <span className="status-dot"></span>
                   {test.isActive ? 'Active' : 'Paused'}
                 </span>
               </div>
-              
+
               {test.targetUrl && (
                 <div className="test-url">
-                  🌐 {test.targetUrl}
+                  {test.targetUrl}
                 </div>
               )}
-              
+
               <div className="variants">
                 {test.variants.map(v => (
-                  <span key={v} className={`variant-badge ${v === 'B' ? 'variant-b' : ''}`}>
+                  <span key={v} className="variant-badge">
                     Variant {v}
                   </span>
                 ))}
               </div>
-              
+
               <div className="test-meta">
                 <div className="test-stat">
                   <span className="test-stat-value">{test.totalSessions}</span>
                   <span className="test-stat-label">Sessions</span>
                 </div>
                 <div className="test-stat">
-                  <span className="test-stat-value" style={{ 
-                    color: test.completionRate >= 70 ? 'var(--accent-emerald)' : 
-                           test.completionRate >= 40 ? 'var(--accent-amber)' : 
-                           test.totalSessions === 0 ? 'var(--text-muted)' : 'var(--accent-rose)' 
+                  <span className="test-stat-value" style={{
+                    color: test.completionRate >= 70 ? 'var(--success)' :
+                           test.completionRate >= 40 ? 'var(--warning)' :
+                           test.totalSessions === 0 ? 'var(--text-3)' : 'var(--danger)'
                   }}>
                     {test.completionRate}%
                   </span>
@@ -88,38 +89,47 @@ function TestList() {
           ))}
         </div>
       )}
-      
+
       <style>{`
         .btn-refresh {
-          padding: 0.5rem 0.75rem;
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border-primary);
-          border-radius: 6px;
-          color: var(--text-secondary);
-          cursor: pointer;
-          font-size: 1rem;
-        }
-        .btn-refresh:hover { background: var(--bg-hover); }
-        
-        .btn-create {
-          padding: 0.5rem 1.25rem;
-          background: var(--gradient-primary);
-          border: none;
-          border-radius: 6px;
-          color: white;
+          background: transparent;
+          border: 1px solid var(--border);
+          color: var(--text-2);
+          padding: 0.375rem 0.75rem;
+          border-radius: var(--radius-md);
           font-size: 0.875rem;
-          font-weight: 600;
+          cursor: pointer;
+          font-family: var(--font-body);
+          transition: border-color 0.15s;
+        }
+        .btn-refresh:hover {
+          border-color: var(--border-focus);
+          color: var(--text);
+        }
+
+        .btn-create {
+          padding: 0.375rem 0.875rem;
+          background: var(--accent);
+          border: none;
+          border-radius: var(--radius-md);
+          color: white;
+          font-size: 0.8rem;
+          font-weight: 500;
           text-decoration: none;
           display: inline-block;
+          font-family: var(--font-body);
+          transition: opacity 0.15s;
         }
-        
+        .btn-create:hover {
+          color: white;
+          opacity: 0.88;
+        }
+
         .test-url {
           margin-top: 0.75rem;
-          padding: 0.5rem 0.75rem;
-          background: rgba(96, 165, 250, 0.1);
-          border-radius: 6px;
           font-size: 0.8rem;
-          color: var(--accent-blue);
+          color: var(--text-3);
+          font-family: var(--font-mono);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;

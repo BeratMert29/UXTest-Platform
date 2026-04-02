@@ -65,27 +65,70 @@
     try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
   }
 
-  // AJAX
+  // Send data via navigator.sendBeacon (CSP-friendly fallback for POST)
+  function sendViaBeacon(url, data) {
+    try {
+      if (navigator.sendBeacon) {
+        var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        var sent = navigator.sendBeacon(url, blob);
+        if (sent) {
+          console.log('[UXTest] Events sent via sendBeacon fallback');
+          return true;
+        }
+      }
+    } catch(e) {
+      console.warn('[UXTest] sendBeacon fallback failed:', e.message);
+    }
+    return false;
+  }
+
+  // AJAX with credentials and CSP fallback
   function ajax(url, method, data) {
     return new Promise(function(resolve, reject) {
-      var xhr = new XMLHttpRequest();
-      xhr.open(method, url, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.timeout = 15000;
-      xhr.onload = function() {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch(e) {
-            resolve({});
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open(method, url, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
+        xhr.timeout = 15000;
+        xhr.onload = function() {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch(e) {
+              resolve({});
+            }
+          } else {
+            reject(new Error('HTTP ' + xhr.status));
           }
-        } else {
-          reject(new Error('HTTP ' + xhr.status));
+        };
+        xhr.onerror = function() {
+          // CSP or CORS may block XHR; try sendBeacon for POST requests
+          if (method === 'POST' && data) {
+            console.warn('[UXTest] XHR blocked (likely CSP/CORS). Attempting sendBeacon fallback...');
+            if (sendViaBeacon(url, data)) {
+              resolve({});
+              return;
+            }
+          }
+          console.error('[UXTest] Network request blocked. This may be caused by the site\'s Content Security Policy (CSP). ' +
+            'If using the bookmarklet, try the Chrome extension instead which bypasses CSP restrictions.');
+          reject(new Error('Network error'));
+        };
+        xhr.ontimeout = function() { reject(new Error('Timeout')); };
+        xhr.send(data ? JSON.stringify(data) : null);
+      } catch(e) {
+        // If XHR itself throws (e.g., CSP blocks the request)
+        if (method === 'POST' && data) {
+          console.warn('[UXTest] XHR failed to send (CSP restriction). Attempting sendBeacon fallback...');
+          if (sendViaBeacon(url, data)) {
+            resolve({});
+            return;
+          }
         }
-      };
-      xhr.onerror = function() { reject(new Error('Network error')); };
-      xhr.ontimeout = function() { reject(new Error('Timeout')); };
-      xhr.send(data ? JSON.stringify(data) : null);
+        console.error('[UXTest] Request failed due to CSP restrictions. Consider using the Chrome extension for this site.');
+        reject(new Error('CSP blocked request'));
+      }
     });
   }
 

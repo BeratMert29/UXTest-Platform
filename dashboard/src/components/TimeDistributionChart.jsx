@@ -9,15 +9,14 @@ function TimeDistributionChart({ distribution }) {
     return (
       <div className="chart-card">
         <h3 className="chart-title">
-          <span className="chart-title-icon">⏱️</span>
           Completion Time Distribution
         </h3>
-        <div style={{ 
-          height: 250, 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          height: 250,
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
-          color: 'var(--text-muted)'
+          color: 'var(--text-3)'
         }}>
           No completion data yet
         </div>
@@ -28,27 +27,26 @@ function TimeDistributionChart({ distribution }) {
   return (
     <div className="chart-card">
       <h3 className="chart-title">
-        <span className="chart-title-icon">⏱️</span>
         Completion Time Distribution
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={250}>
         <BarChart data={distribution}>
-          <XAxis 
-            dataKey="bucket" 
-            stroke="var(--text-muted)"
+          <XAxis
+            dataKey="bucket"
+            stroke="var(--text-3)"
             fontSize={12}
           />
-          <YAxis 
-            stroke="var(--text-muted)"
+          <YAxis
+            stroke="var(--text-3)"
             fontSize={12}
             allowDecimals={false}
           />
           <Tooltip
             contentStyle={{
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: '8px',
+              background: 'var(--bg-active)',
+              border: '1px solid var(--border-focus)',
+              borderRadius: '6px',
               fontSize: '0.875rem'
             }}
             formatter={(value) => [value, 'Sessions']}

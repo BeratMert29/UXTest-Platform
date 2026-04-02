@@ -15,8 +15,31 @@ console.log('[API] Using backend:', API_BASE);
 const CACHE_TTL = 30000; // 30 seconds cache
 const REQUEST_TIMEOUT = 10000; // 10 seconds timeout
 
-// Simple in-memory cache
+// In-memory cache backed by localStorage for persistence across refreshes
 const cache = new Map();
+const CACHE_PREFIX = 'uxtest_cache_';
+
+// Hydrate in-memory cache from localStorage on load
+function hydrateCache() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const storageKey = localStorage.key(i);
+      if (storageKey && storageKey.startsWith(CACHE_PREFIX)) {
+        const entry = JSON.parse(localStorage.getItem(storageKey));
+        if (entry && (Date.now() - entry.timestamp) < CACHE_TTL) {
+          const cacheKey = storageKey.slice(CACHE_PREFIX.length);
+          cache.set(cacheKey, entry);
+        } else {
+          // Expired - clean up
+          localStorage.removeItem(storageKey);
+        }
+      }
+    }
+  } catch(e) {
+    // localStorage may be unavailable
+  }
+}
+hydrateCache();
 
 /**
  * Get cached response if valid
@@ -35,13 +58,19 @@ function getCached(key) {
 }
 
 /**
- * Set cache entry
+ * Set cache entry (in-memory + localStorage)
  */
 function setCache(key, data) {
-  cache.set(key, {
+  const entry = {
     data,
     timestamp: Date.now()
-  });
+  };
+  cache.set(key, entry);
+  try {
+    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+  } catch(e) {
+    // localStorage full or unavailable - in-memory cache still works
+  }
 }
 
 /**
@@ -106,6 +135,16 @@ async function request(endpoint, options = {}) {
  */
 export function clearCache() {
   cache.clear();
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(function(key) { localStorage.removeItem(key); });
+  } catch(e) {}
 }
 
 /**

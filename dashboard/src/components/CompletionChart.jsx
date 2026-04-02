@@ -11,31 +11,30 @@ function CompletionChart({ variants, activeVariant }) {
   return (
     <div className="chart-card">
       <h3 className="chart-title">
-        <span className="chart-title-icon">📊</span>
         Completion vs Abandon Rate
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={250}>
         <BarChart data={data} layout="vertical" barGap={8}>
-          <XAxis 
-            type="number" 
-            domain={[0, 100]} 
+          <XAxis
+            type="number"
+            domain={[0, 100]}
             tickFormatter={(v) => `${v}%`}
-            stroke="var(--text-muted)"
+            stroke="var(--text-3)"
             fontSize={12}
           />
-          <YAxis 
-            type="category" 
-            dataKey="name" 
+          <YAxis
+            type="category"
+            dataKey="name"
             width={80}
-            stroke="var(--text-muted)"
+            stroke="var(--text-3)"
             fontSize={12}
           />
           <Tooltip
             contentStyle={{
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: '8px',
+              background: 'var(--bg-active)',
+              border: '1px solid var(--border-focus)',
+              borderRadius: '6px',
               fontSize: '0.875rem'
             }}
             formatter={(value) => [`${value}%`]}

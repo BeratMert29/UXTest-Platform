@@ -7,10 +7,26 @@ import TimeDistributionChart from '../components/TimeDistributionChart';
 import CompletionChart from '../components/CompletionChart';
 import ErrorsChart from '../components/ErrorsChart';
 
+const VARIANT_KEY = 'uxtest_active_variant';
+
 function TestDetail() {
   const { testId } = useParams();
-  const [activeVariant, setActiveVariant] = useState('A');
-  
+
+  // Restore activeVariant from localStorage, default to 'A'
+  const [activeVariant, setActiveVariant] = useState(() => {
+    try {
+      const stored = localStorage.getItem(VARIANT_KEY);
+      if (stored === 'A' || stored === 'B') return stored;
+    } catch(e) {}
+    return 'A';
+  });
+
+  // Persist activeVariant changes
+  const handleSetActiveVariant = useCallback((v) => {
+    setActiveVariant(v);
+    try { localStorage.setItem(VARIANT_KEY, v); } catch(e) {}
+  }, []);
+
   const fetchData = useCallback(async () => {
     const [analytics, test] = await Promise.all([
       getAnalytics(testId),
@@ -18,14 +34,14 @@ function TestDetail() {
     ]);
     return { analytics, test };
   }, [testId]);
-  
+
   const { data, loading, error, refresh } = usePolling(fetchData, { interval: 15000 });
-  
+
   const analytics = data?.analytics;
   const test = data?.test;
   const variants = analytics ? Object.keys(analytics.variants) : [];
   const currentVariant = analytics?.variants[activeVariant] || analytics?.variants['A'];
-  
+
   if (loading) {
     return (
       <div className="loading">
@@ -33,7 +49,7 @@ function TestDetail() {
       </div>
     );
   }
-  
+
   if (error || !analytics || !test) {
     return (
       <div>
@@ -45,11 +61,11 @@ function TestDetail() {
       </div>
     );
   }
-  
+
   return (
     <div>
       <Link to="/" className="back-link">← Back to Tests</Link>
-      
+
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -59,58 +75,66 @@ function TestDetail() {
           <button onClick={refresh} className="btn-refresh">↻ Refresh</button>
         </div>
       </div>
-      
+
       {variants.length > 1 && (
         <div className="variant-tabs">
           {variants.map(v => (
             <button
               key={v}
-              className={`variant-tab ${v === 'B' ? 'variant-b' : ''} ${activeVariant === v ? 'active' : ''}`}
-              onClick={() => setActiveVariant(v)}
+              className={`variant-tab ${activeVariant === v ? 'active' : ''}`}
+              onClick={() => handleSetActiveVariant(v)}
             >
               Variant {v}
             </button>
           ))}
         </div>
       )}
-      
+
       {currentVariant && (
         <>
           <MetricsGrid variant={currentVariant} />
-          
+
           <div className="charts-section">
             <CompletionChart variants={analytics.variants} activeVariant={activeVariant} />
             <TimeDistributionChart distribution={currentVariant.timeDistribution} />
           </div>
-          
+
           <div className="charts-section">
             <ErrorsChart errors={currentVariant.errors} />
             <div className="chart-card">
-              <h3 className="chart-title">
-                <span className="chart-title-icon">📋</span>
-                Session Details
-              </h3>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                <p><strong>Total:</strong> {currentVariant.sessions} | <strong>Completed:</strong> {currentVariant.completed} | <strong>Abandoned:</strong> {currentVariant.abandoned}</p>
-                <p><strong>Time Range:</strong> {formatTime(currentVariant.minCompletionTimeMs)} - {formatTime(currentVariant.maxCompletionTimeMs)}</p>
+              <h3 className="chart-title">Session Details</h3>
+              <div>
+                <p style={{ lineHeight: 2, fontSize: '0.875rem', color: 'var(--text-2)' }}>
+                  <strong style={{ color: 'var(--text)' }}>Total:</strong> {currentVariant.sessions} &nbsp;
+                  <strong style={{ color: 'var(--text)' }}>Completed:</strong> {currentVariant.completed} &nbsp;
+                  <strong style={{ color: 'var(--text)' }}>Abandoned:</strong> {currentVariant.abandoned}
+                </p>
+                <p style={{ lineHeight: 2, fontSize: '0.875rem', color: 'var(--text-2)' }}>
+                  <strong style={{ color: 'var(--text)' }}>Time Range:</strong> {formatTime(currentVariant.minCompletionTimeMs)} – {formatTime(currentVariant.maxCompletionTimeMs)}
+                </p>
               </div>
             </div>
           </div>
         </>
       )}
-      
+
       <style>{`
         .btn-refresh {
-          padding: 0.5rem 1rem;
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border-primary);
-          border-radius: 6px;
-          color: var(--text-secondary);
+          background: transparent;
+          border: 1px solid var(--border);
+          color: var(--text-2);
+          padding: 0.375rem 0.75rem;
+          border-radius: var(--radius-md);
+          font-size: 0.8rem;
           cursor: pointer;
-          font-size: 0.875rem;
+          font-family: var(--font-body);
+          transition: border-color 0.15s;
         }
-        .btn-refresh:hover { background: var(--bg-hover); }
-        
+        .btn-refresh:hover {
+          border-color: var(--border-focus);
+          color: var(--text);
+        }
+
         .variant-tabs {
           display: flex;
           gap: 0.5rem;

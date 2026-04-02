@@ -16,9 +16,23 @@ const PORT = process.env.PORT || 3001;
 // Create Express app
 const app = express();
 
-// Middleware - Allow all origins for development/testing
+// Middleware - CORS with credentials support
 app.use(cors({
-  origin: true,  // Allow any origin (including file://)
+  origin: function(origin, callback) {
+    // Allow requests with no origin (bookmarklets, extensions, server-to-server)
+    if (!origin) return callback(null, true);
+    // Allow localhost development, deployed dashboard, and any site running the SDK
+    var allowed = [
+      /^https?:\/\/localhost(:\d+)?$/,
+      /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+      /^https:\/\/.*\.onrender\.com$/,
+      /^https:\/\/.*\.vercel\.app$/
+    ];
+    var isAllowed = allowed.some(function(pattern) { return pattern.test(origin); });
+    // Also allow any origin for SDK event collection (the SDK runs on arbitrary sites)
+    callback(null, true);
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type']
 }));

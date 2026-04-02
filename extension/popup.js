@@ -56,12 +56,23 @@ function renderTests() {
     return;
   }
   
-  testListEl.innerHTML = tests.map(test => `
+  testListEl.innerHTML = tests.map(test => {
+    let hostnameBadge = '';
+    if (test.targetUrl) {
+      try {
+        hostnameBadge = `<div class="test-site">${new URL(test.targetUrl).hostname}</div>`;
+      } catch (_) {
+        hostnameBadge = `<div class="test-site">${test.targetUrl}</div>`;
+      }
+    }
+    return `
     <div class="test-item ${selectedTest?.id === test.id ? 'active' : ''}" data-id="${test.id}">
       <div class="test-name">${test.name}</div>
       <div class="test-desc">${test.description || ''}</div>
+      ${hostnameBadge}
     </div>
-  `).join('');
+  `;
+  }).join('');
   
   // Add click handlers
   testListEl.querySelectorAll('.test-item').forEach(el => {
@@ -104,13 +115,18 @@ startBtn.addEventListener('click', async () => {
     projectId: 'demo-project'
   };
   
-  // Save to storage
+  // Save to storage — content.js reads this on load and auto-injects the SDK
   await chrome.storage.local.set({ activeTest });
-  
-  // Notify content script
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  chrome.tabs.sendMessage(tab.id, { type: 'START_TEST', test: activeTest });
-  
+
+  if (selectedTest.targetUrl) {
+    // Open the target URL in a new tab; content.js will auto-inject the SDK on load
+    chrome.tabs.create({ url: selectedTest.targetUrl });
+  } else {
+    // No targetUrl — fall back to injecting into whichever tab is currently active
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { type: 'START_TEST', test: activeTest });
+  }
+
   updateStatus(true, activeTest.name);
   startBtn.style.display = 'none';
   stopBtn.style.display = 'block';

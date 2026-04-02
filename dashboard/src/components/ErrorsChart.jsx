@@ -19,15 +19,14 @@ function ErrorsChart({ errors }) {
     return (
       <div className="chart-card">
         <h3 className="chart-title">
-          <span className="chart-title-icon">⚠️</span>
           Error Distribution
         </h3>
-        <div style={{ 
-          height: 200, 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          height: 200,
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
-          color: 'var(--accent-emerald)',
+          color: 'var(--success)',
           flexDirection: 'column',
           gap: '0.5rem'
         }}>
@@ -41,10 +40,9 @@ function ErrorsChart({ errors }) {
   return (
     <div className="chart-card">
       <h3 className="chart-title">
-        <span className="chart-title-icon">⚠️</span>
         Error Distribution
       </h3>
-      
+
       <ResponsiveContainer width="100%" height={200}>
         <PieChart>
           <Pie
@@ -62,15 +60,15 @@ function ErrorsChart({ errors }) {
           </Pie>
           <Tooltip
             contentStyle={{
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: '8px',
+              background: 'var(--bg-active)',
+              border: '1px solid var(--border-focus)',
+              borderRadius: '6px',
               fontSize: '0.875rem'
             }}
           />
-          <Legend 
+          <Legend
             verticalAlign="bottom"
-            formatter={(value) => <span style={{ color: 'var(--text-secondary)' }}>{value}</span>}
+            formatter={(value) => <span style={{ color: 'var(--text-2)' }}>{value}</span>}
           />
         </PieChart>
       </ResponsiveContainer>

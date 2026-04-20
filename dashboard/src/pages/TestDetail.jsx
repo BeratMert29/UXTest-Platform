@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getAnalytics, getTest } from '../api/client';
 import { usePolling } from '../hooks/usePolling';
@@ -30,17 +30,30 @@ function TestDetail() {
   const fetchData = useCallback(async () => {
     const [analytics, test] = await Promise.all([
       getAnalytics(testId),
-      getTest(testId)
+      getTest(testId, { skipCache: true })
     ]);
     return { analytics, test };
   }, [testId]);
 
-  const { data, loading, error, refresh } = usePolling(fetchData, { interval: 15000 });
+  const { data, loading, error, refresh } = usePolling(fetchData, { interval: 10000 });
 
   const analytics = data?.analytics;
   const test = data?.test;
   const variants = analytics ? Object.keys(analytics.variants) : [];
   const currentVariant = analytics?.variants[activeVariant] || analytics?.variants['A'];
+
+  const sessionCode = test?.sessionCode || null;
+  const [codeCopied, setCodeCopied] = useState(false);
+  const copyCodeTimeout = useRef(null);
+
+  const handleCopyCode = useCallback(() => {
+    if (!sessionCode) return;
+    navigator.clipboard.writeText(sessionCode).then(() => {
+      setCodeCopied(true);
+      if (copyCodeTimeout.current) clearTimeout(copyCodeTimeout.current);
+      copyCodeTimeout.current = setTimeout(() => setCodeCopied(false), 2000);
+    }).catch(() => {});
+  }, [sessionCode]);
 
   if (loading) {
     return (
@@ -75,6 +88,19 @@ function TestDetail() {
           <button onClick={refresh} className="btn-refresh">↻ Refresh</button>
         </div>
       </div>
+
+      {sessionCode && (
+        <div className="session-code-bar">
+          <div className="session-code-label">Session Code</div>
+          <div className="session-code-row">
+            <span className="session-code-value">{sessionCode}</span>
+            <button className="session-code-copy" onClick={handleCopyCode}>
+              {codeCopied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="session-code-hint">Paste this code into the browser extension to start a test session.</p>
+        </div>
+      )}
 
       {variants.length > 1 && (
         <div className="variant-tabs">
@@ -133,6 +159,54 @@ function TestDetail() {
         .btn-refresh:hover {
           border-color: var(--border-focus);
           color: var(--text);
+        }
+
+        .session-code-bar {
+          background: var(--surface-2, rgba(255,255,255,0.04));
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 0.875rem 1rem;
+          margin-bottom: 1.5rem;
+        }
+        .session-code-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--text-3);
+          margin-bottom: 0.4rem;
+        }
+        .session-code-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        .session-code-value {
+          font-family: var(--font-mono);
+          font-size: 1.5rem;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          color: var(--accent);
+        }
+        .session-code-copy {
+          padding: 0.25rem 0.625rem;
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm, 4px);
+          color: var(--text-2);
+          font-size: 0.75rem;
+          cursor: pointer;
+          font-family: var(--font-body);
+          transition: border-color 0.15s, color 0.15s;
+        }
+        .session-code-copy:hover {
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        .session-code-hint {
+          font-size: 0.75rem;
+          color: var(--text-3);
+          margin-top: 0.4rem;
         }
 
         .variant-tabs {

@@ -12,7 +12,7 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://uxtest-backend.onrender.com';
 
 console.log('[API] Using backend:', API_BASE);
-const CACHE_TTL = 30000; // 30 seconds cache
+const CACHE_TTL = 5000; // 5 seconds cache
 const REQUEST_TIMEOUT = 10000; // 10 seconds timeout
 
 // In-memory cache backed by localStorage for persistence across refreshes
@@ -165,7 +165,7 @@ export async function getTest(testId, options = {}) {
  * Get analytics for a test
  */
 export async function getAnalytics(testId, options = {}) {
-  return request(`/analytics/${encodeURIComponent(testId)}`, options);
+  return request(`/analytics/${encodeURIComponent(testId)}`, { ...options, skipCache: true });
 }
 
 /**
@@ -220,6 +220,13 @@ export async function createProject(projectData, options = {}) {
     method: 'POST',
     body: JSON.stringify(projectData)
   });
+}
+
+/**
+ * Get test config by session code (6-char code derived from test ID)
+ */
+export async function getTestBySessionCode(code, options = {}) {
+  return request(`/session/${encodeURIComponent(code)}`, { ...options, skipCache: true });
 }
 
 /**

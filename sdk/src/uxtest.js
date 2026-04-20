@@ -20,6 +20,8 @@
   var widgetElement = null;
   var currentTaskIndex = 0;
   var taskStartTime = null;
+  var navigationSetupDone = false;
+  var testComplete = false;
 
   function generateUUID() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -33,6 +35,7 @@
 
   // Session persistence - survives page navigation
   function saveSession() {
+    if (testComplete) return;
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify({
         sessionId: sessionId,
@@ -44,6 +47,12 @@
         currentTaskIndex: currentTaskIndex,
         taskStartTime: taskStartTime,
         timestamp: now()
+      }));
+      localStorage.setItem('uxtest_reinit', JSON.stringify({
+        projectId: config.projectId,
+        testId: config.testId,
+        variant: config.variant,
+        endpoint: config.endpoint
       }));
     } catch(e) {}
   }
@@ -63,6 +72,7 @@
 
   function clearSession() {
     try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+    try { localStorage.removeItem('uxtest_reinit'); } catch(e) {}
   }
 
   // Send data via navigator.sendBeacon (CSP-friendly fallback for POST)
@@ -84,6 +94,9 @@
 
   // AJAX with credentials and CSP fallback
   function ajax(url, method, data) {
+    if (typeof window !== 'undefined' && typeof window.__uxtestFetch === 'function') {
+      return window.__uxtestFetch(url, method, data || null);
+    }
     return new Promise(function(resolve, reject) {
       try {
         var xhr = new XMLHttpRequest();
@@ -187,7 +200,7 @@
   // Widget UI
   function createWidget() {
     if (widgetElement) {
-      document.body.removeChild(widgetElement);
+      try { document.body.removeChild(widgetElement); } catch(e) {}
     }
 
     var widget = document.createElement('div');
@@ -204,8 +217,8 @@
 
   function renderWidget() {
     if (!widgetElement || !testConfig) return;
-    
     var tasks = testConfig.tasks || [];
+    if (currentTaskIndex >= tasks.length) { showComplete(false); return; }
     var currentTask = tasks[currentTaskIndex];
     var progress = tasks.length > 0 ? ((currentTaskIndex) / tasks.length * 100) : 0;
     
@@ -222,22 +235,40 @@
         '<div class="ux-nav-hint">💡 Widget stays active when you navigate!</div>' +
       '</div>' +
       '<div class="ux-footer">' +
-        '<button class="ux-btn ux-btn-done" onclick="UXTest.success()">✓ Done</button>' +
-        '<button class="ux-btn ux-btn-skip" onclick="UXTest.nextTask()">Skip →</button>' +
-        '<button class="ux-btn ux-btn-abandon" onclick="UXTest.abandon(\'user_quit\')">✗ Quit</button>' +
+        '<button class="ux-btn ux-btn-done">✓ Done</button>' +
+        '<button class="ux-btn ux-btn-skip">Skip →</button>' +
+        '<button class="ux-btn ux-btn-abandon">✗ Quit</button>' +
       '</div>';
+
+    var doneBtn = widgetElement.querySelector('.ux-btn-done');
+    var skipBtn = widgetElement.querySelector('.ux-btn-skip');
+    var abandonBtn = widgetElement.querySelector('.ux-btn-abandon');
+    if (doneBtn) doneBtn.addEventListener('click', function() { UXTest.success(); });
+    if (skipBtn) skipBtn.addEventListener('click', function() { UXTest.nextTask(); });
+    if (abandonBtn) abandonBtn.addEventListener('click', function() { UXTest.abandon('user_quit'); });
+
+    updateTimer();
   }
 
   function showComplete(abandoned) {
+    testComplete = true;
+    isInitialized = false;
     if (!widgetElement) return;
     clearSession();
+    window.dispatchEvent(new CustomEvent('uxtest:complete'));
     widgetElement.innerHTML = '' +
       '<div class="ux-complete">' +
         '<div class="ux-complete-icon">' + (abandoned ? '👋' : '🎉') + '</div>' +
         '<h3>' + (abandoned ? 'Test Ended' : 'All Done!') + '</h3>' +
         '<p>' + (abandoned ? 'Thanks for participating' : 'Thank you for testing!') + '</p>' +
-        '<button class="ux-btn ux-btn-done" onclick="document.getElementById(\'uxtest-widget\').remove()" style="margin-top:15px">Close</button>' +
+        '<button class="ux-btn ux-btn-done" style="margin-top:15px">Close</button>' +
       '</div>';
+
+    var closeBtn = widgetElement.querySelector('.ux-btn-done');
+    if (closeBtn) closeBtn.addEventListener('click', function() {
+      var w = document.getElementById('uxtest-widget');
+      if (w) w.remove();
+    });
   }
 
   function updateTimer() {
@@ -295,6 +326,44 @@
       });
   }
 
+  function setupNavigationPersistence() {
+    if (navigationSetupDone) return;
+    navigationSetupDone = true;
+
+    // Intercept history.pushState (SPA navigation)
+    var origPushState = history.pushState.bind(history);
+    history.pushState = function() {
+      origPushState.apply(history, arguments);
+      saveSession();
+      enqueue('page_navigated', { url: location.href });
+      if (!document.getElementById('uxtest-widget')) createWidget();
+    };
+
+    // Intercept history.replaceState (SPA navigation)
+    var origReplaceState = history.replaceState.bind(history);
+    history.replaceState = function() {
+      origReplaceState.apply(history, arguments);
+      if (!document.getElementById('uxtest-widget')) createWidget();
+    };
+
+    // Handle browser back/forward in SPAs
+    window.addEventListener('popstate', function() {
+      saveSession();
+      enqueue('page_navigated', { url: location.href });
+      if (!document.getElementById('uxtest-widget')) createWidget();
+    });
+
+    // MutationObserver: re-create widget if something removes it from the DOM
+    if (typeof MutationObserver !== 'undefined') {
+      var observer = new MutationObserver(function() {
+        if (isInitialized && !document.getElementById('uxtest-widget')) {
+          createWidget();
+        }
+      });
+      observer.observe(document.body || document.documentElement, { childList: true });
+    }
+  }
+
   // Public API
   var UXTest = {
     init: function(options) {
@@ -324,11 +393,15 @@
         enqueue('page_navigated', { url: location.href });
         
         flushTimer = setInterval(flush, 10000);
-        window.addEventListener('beforeunload', function() { flush(); saveSession(); });
-        
+        window.addEventListener('beforeunload', function() { saveSession(); flush(); });
+        document.addEventListener('visibilitychange', function() {
+          if (document.hidden) saveSession();
+        });
+
         return fetchTestConfig().then(function() {
           createWidget();
           setInterval(updateTimer, 1000);
+          setupNavigationPersistence();
           console.log('[UXTest] Session resumed - Task', currentTaskIndex + 1);
         });
       }
@@ -358,11 +431,30 @@
       saveSession();
 
       flushTimer = setInterval(flush, 10000);
-      window.addEventListener('beforeunload', function() { flush(); saveSession(); });
+      window.addEventListener('beforeunload', function() { saveSession(); flush(); });
+      document.addEventListener('visibilitychange', function() {
+        if (document.hidden) saveSession();
+      });
+
+      // If tasks were pre-fetched by the extension, use them directly
+      if (options.tasks && options.tasks.length > 0) {
+        testConfig = {
+          id: config.testId,
+          name: options.tasks[0] ? options.tasks[0].title : config.testId,
+          tasks: options.tasks
+        };
+        return Promise.resolve().then(function() {
+          createWidget();
+          setupNavigationPersistence();
+          setInterval(updateTimer, 1000);
+          console.log('[UXTest] Started with pre-fetched tasks -', options.tasks.length, 'tasks');
+        });
+      }
 
       return fetchTestConfig().then(function() {
         createWidget();
         setInterval(updateTimer, 1000);
+        setupNavigationPersistence();
         console.log('[UXTest] Started -', testConfig.tasks.length, 'tasks');
       });
     },
@@ -433,4 +525,20 @@
   };
 
   global.UXTest = UXTest;
+
+  // Auto-resume: when SDK is re-injected by bookmarklet, check for an active session
+  // and resume it automatically so the user doesn't have to worry about state loss.
+  (function() {
+    if (isInitialized) return;
+    if (typeof window !== 'undefined' && window.__uxtestNoAutoResume) return;
+    try {
+      var stored = localStorage.getItem(SESSION_KEY);
+      if (!stored) return;
+      var session = JSON.parse(stored);
+      if (!session || (Date.now() - session.timestamp) >= 3600000) return;
+      var opts = JSON.parse(localStorage.getItem('uxtest_reinit') || 'null');
+      if (!opts || opts.testId !== session.testId) return;
+      UXTest.init(opts);
+    } catch(e) {}
+  })();
 })(typeof window !== 'undefined' ? window : this);

@@ -10,6 +10,7 @@ import eventsRouter from './routes/events.js';
 import testsRouter from './routes/tests.js';
 import analyticsRouter from './routes/analytics.js';
 import projectsRouter from './routes/projects.js';
+import sessionRouter from './routes/session.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -62,6 +63,7 @@ app.use('/events', eventsRouter);
 app.use('/tests', testsRouter);
 app.use('/analytics', analyticsRouter);
 app.use('/projects', projectsRouter);
+app.use('/session', sessionRouter);
 
 // Health check
 app.get('/health', (req, res) => {

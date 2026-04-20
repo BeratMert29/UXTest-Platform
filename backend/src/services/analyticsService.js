@@ -140,16 +140,17 @@ export async function getProjectSummary(projectId) {
   await getDatabase();
   
   const tests = query(`
-    SELECT t.id, t.name, t.description, t.target_url, t.instructions, t.variants, t.is_active, t.created_at,
+    SELECT t.id, t.name, t.description, t.target_url, t.instructions, t.variants, t.is_active, t.created_at, t.session_code,
       (SELECT COUNT(*) FROM sessions s WHERE s.test_id = t.id) as total_sessions,
       (SELECT COUNT(*) FROM sessions s WHERE s.test_id = t.id AND s.outcome = 'completed') as completed_sessions
     FROM tests t
     WHERE t.project_id = ?
     ORDER BY t.created_at DESC
   `, [projectId]);
-  
+
   return tests.map(test => ({
     id: test.id,
+    sessionCode: test.session_code,
     name: test.name,
     description: test.description,
     targetUrl: test.target_url,
@@ -158,8 +159,8 @@ export async function getProjectSummary(projectId) {
     isActive: Boolean(test.is_active),
     createdAt: test.created_at,
     totalSessions: test.total_sessions,
-    completionRate: test.total_sessions > 0 
-      ? Math.round((test.completed_sessions / test.total_sessions) * 100 * 10) / 10 
+    completionRate: test.total_sessions > 0
+      ? Math.round((test.completed_sessions / test.total_sessions) * 100 * 10) / 10
       : 0
   }));
 }

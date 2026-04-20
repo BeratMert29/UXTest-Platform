@@ -38,7 +38,11 @@ export async function initDatabase() {
   // Run schema
   const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
   db.run(schema);
-  
+
+  // Migration: add session_code column and populate missing codes
+  try { db.run("ALTER TABLE tests ADD COLUMN session_code TEXT"); } catch(e) {}
+  db.run("UPDATE tests SET session_code = UPPER(HEX(RANDOMBLOB(3))) WHERE session_code IS NULL OR session_code = ''");
+
   saveDatabase();
   console.log('[DB] Database initialized');
   return db;

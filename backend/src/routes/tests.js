@@ -25,7 +25,7 @@ router.get('/:id', async (req, res) => {
   try {
     await getDatabase();
     const test = queryOne(`
-      SELECT id, project_id, name, description, target_url, instructions, timeout_ms, variants, is_active, created_at
+      SELECT id, project_id, name, description, target_url, instructions, timeout_ms, variants, is_active, created_at, session_code
       FROM tests WHERE id = ?
     `, [req.params.id]);
     
@@ -43,6 +43,7 @@ router.get('/:id', async (req, res) => {
     res.json({
       id: test.id,
       projectId: test.project_id,
+      sessionCode: test.session_code,
       name: test.name,
       description: test.description,
       targetUrl: test.target_url,
@@ -77,11 +78,12 @@ router.post('/', async (req, res) => {
     }
     
     const testId = `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+    const sessionCode = [...Array(6)].map(() => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
+
     run(`
-      INSERT INTO tests (id, project_id, name, description, target_url, instructions, timeout_ms, variants)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [testId, projectId, name, description || null, targetUrl || null, instructions || null, timeoutMs || 300000, JSON.stringify(variants || ['A'])]);
+      INSERT INTO tests (id, project_id, name, description, target_url, instructions, timeout_ms, variants, session_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [testId, projectId, name, description || null, targetUrl || null, instructions || null, timeoutMs || 300000, JSON.stringify(variants || ['A']), sessionCode]);
     
     // Insert tasks if provided
     const createdTasks = [];
@@ -97,6 +99,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({
       id: testId,
       projectId,
+      sessionCode,
       name,
       description,
       targetUrl,

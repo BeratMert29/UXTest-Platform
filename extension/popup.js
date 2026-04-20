@@ -1,93 +1,41 @@
 // Default backend URL
-const DEFAULT_BACKEND = 'https://uxtest-backend.onrender.com';
+const DEFAULT_BACKEND = 'http://localhost:3001';
 
-let tests = [];
-let selectedTest = null;
 let activeTest = null;
 
 // Elements
-const testListEl = document.getElementById('test-list');
 const startBtn = document.getElementById('start-btn');
 const stopBtn = document.getElementById('stop-btn');
 const statusBar = document.getElementById('status-bar');
 const statusText = document.getElementById('status-text');
 const backendInput = document.getElementById('backend-url');
+const sessionCodeInput = document.getElementById('session-code');
 
 // Initialize
 async function init() {
-  // Load saved backend URL
+  // Load saved backend URL and active test
   const stored = await chrome.storage.local.get(['backendUrl', 'activeTest']);
   backendInput.value = stored.backendUrl || DEFAULT_BACKEND;
-  
+
   if (stored.activeTest) {
     activeTest = stored.activeTest;
     updateStatus(true, activeTest.name);
     stopBtn.style.display = 'block';
     startBtn.style.display = 'none';
   }
-  
-  // Load tests
-  await loadTests();
-  
+
   // Save backend URL on change
   backendInput.addEventListener('change', () => {
     chrome.storage.local.set({ backendUrl: backendInput.value });
-    loadTests();
   });
-}
 
-async function loadTests() {
-  const backendUrl = backendInput.value || DEFAULT_BACKEND;
-  testListEl.innerHTML = '<div class="loading">Loading tests...</div>';
-  
-  try {
-    const response = await fetch(`${backendUrl}/tests`);
-    const data = await response.json();
-    tests = (data.tests || data).filter(t => t.isActive);
-    renderTests();
-  } catch (err) {
-    testListEl.innerHTML = '<div class="empty">Could not load tests. Check backend URL.</div>';
-  }
-}
-
-function renderTests() {
-  if (tests.length === 0) {
-    testListEl.innerHTML = '<div class="empty">No active tests available</div>';
-    return;
-  }
-  
-  testListEl.innerHTML = tests.map(test => {
-    let hostnameBadge = '';
-    if (test.targetUrl) {
-      try {
-        hostnameBadge = `<div class="test-site">${new URL(test.targetUrl).hostname}</div>`;
-      } catch (_) {
-        hostnameBadge = `<div class="test-site">${test.targetUrl}</div>`;
-      }
+  // Enable Start button only when a code is typed
+  sessionCodeInput.addEventListener('input', () => {
+    startBtn.disabled = !sessionCodeInput.value.trim();
+    if (startBtn.textContent !== 'Start Test') {
+      startBtn.textContent = 'Start Test';
     }
-    return `
-    <div class="test-item ${selectedTest?.id === test.id ? 'active' : ''}" data-id="${test.id}">
-      <div class="test-name">${test.name}</div>
-      <div class="test-desc">${test.description || ''}</div>
-      ${hostnameBadge}
-    </div>
-  `;
-  }).join('');
-  
-  // Add click handlers
-  testListEl.querySelectorAll('.test-item').forEach(el => {
-    el.addEventListener('click', () => selectTest(el.dataset.id));
   });
-}
-
-function selectTest(testId) {
-  selectedTest = tests.find(t => t.id === testId);
-  renderTests();
-  
-  if (selectedTest && !activeTest) {
-    startBtn.disabled = false;
-    startBtn.textContent = `Start: ${selectedTest.name}`;
-  }
 }
 
 function updateStatus(active, testName) {
@@ -100,56 +48,75 @@ function updateStatus(active, testName) {
   }
 }
 
-// Start test
+// Start test via session code
 startBtn.addEventListener('click', async () => {
-  if (!selectedTest) return;
-  
+  const code = sessionCodeInput.value.trim().toUpperCase();
+  if (!code) return;
+
   const backendUrl = backendInput.value || DEFAULT_BACKEND;
-  const variant = selectedTest.variants?.includes('B') && Math.random() > 0.5 ? 'B' : 'A';
-  
-  activeTest = {
-    id: selectedTest.id,
-    name: selectedTest.name,
-    variant,
-    backendUrl,
-    projectId: 'demo-project'
-  };
-  
-  // Save to storage — content.js reads this on load and auto-injects the SDK
-  await chrome.storage.local.set({ activeTest });
 
-  if (selectedTest.targetUrl) {
-    // Open the target URL in a new tab; content.js will auto-inject the SDK on load
-    chrome.tabs.create({ url: selectedTest.targetUrl });
-  } else {
-    // No targetUrl — fall back to injecting into whichever tab is currently active
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { type: 'START_TEST', test: activeTest });
+  startBtn.disabled = true;
+  startBtn.textContent = 'Loading...';
+
+  try {
+    const res = await fetch(`${backendUrl}/session/${encodeURIComponent(code)}`);
+
+    if (!res.ok) {
+      startBtn.textContent = res.status === 404 ? 'Code not found. Try again.' : `Error ${res.status}. Try again.`;
+      startBtn.disabled = false;
+      return;
+    }
+
+    const testConfig = await res.json();
+    const variant = testConfig.variants?.includes('B') && Math.random() > 0.5 ? 'B' : 'A';
+
+    activeTest = {
+      id: testConfig.id,
+      name: testConfig.name,
+      variant,
+      backendUrl,
+      projectId: testConfig.projectId || 'demo-project',
+      tasks: testConfig.tasks || []
+    };
+
+    // Save to storage — content.js reads this on page load and auto-injects the SDK
+    await chrome.storage.local.set({ activeTest });
+
+    if (testConfig.targetUrl) {
+      // Open the target URL in a new tab; content.js will auto-inject the SDK on load
+      chrome.tabs.create({ url: testConfig.targetUrl });
+    } else {
+      // No targetUrl — inject into the currently active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      chrome.tabs.sendMessage(tab.id, { type: 'START_TEST', test: activeTest });
+    }
+
+    updateStatus(true, activeTest.name);
+    startBtn.style.display = 'none';
+    stopBtn.style.display = 'block';
+
+    window.close();
+  } catch (err) {
+    startBtn.textContent = 'Error. Check backend URL.';
+    startBtn.disabled = false;
   }
-
-  updateStatus(true, activeTest.name);
-  startBtn.style.display = 'none';
-  stopBtn.style.display = 'block';
-  
-  window.close();
 });
 
 // Stop test
 stopBtn.addEventListener('click', async () => {
-  // Notify content script
+  // Notify content script in the active tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  chrome.tabs.sendMessage(tab.id, { type: 'STOP_TEST' });
-  
+  chrome.tabs.sendMessage(tab.id, { type: 'STOP_TEST' }).catch(() => {});
+
   activeTest = null;
   await chrome.storage.local.remove('activeTest');
-  
+
   updateStatus(false);
   stopBtn.style.display = 'none';
   startBtn.style.display = 'block';
   startBtn.disabled = true;
-  startBtn.textContent = 'Select a test to start';
-  selectedTest = null;
-  renderTests();
+  startBtn.textContent = 'Start Test';
+  sessionCodeInput.value = '';
 });
 
 init();

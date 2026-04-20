@@ -7,85 +7,61 @@ let activeTest = null;
 
 // Check for active test on page load
 async function checkActiveTest() {
+  // Check chrome.storage.local first (set by popup, or synced from a previous page)
   const stored = await chrome.storage.local.get('activeTest');
   if (stored.activeTest) {
     activeTest = stored.activeTest;
     loadSDK();
+    return;
+  }
+
+  // Also check the page's localStorage for bookmarklet-started sessions
+  try {
+    const sessionRaw = localStorage.getItem('uxtest_session');
+    const reinitRaw = localStorage.getItem('uxtest_reinit');
+    if (!sessionRaw || !reinitRaw) return;
+
+    const session = JSON.parse(sessionRaw);
+    const reinit = JSON.parse(reinitRaw);
+
+    // Only resume if session is less than 1 hour old and testIds match
+    if (!session || !reinit) return;
+    if ((Date.now() - session.timestamp) >= 3600000) return;
+    if (reinit.testId !== session.testId) return;
+
+    activeTest = {
+      projectId: reinit.projectId,
+      id: reinit.testId,
+      variant: reinit.variant,
+      backendUrl: reinit.endpoint,
+      name: reinit.testId
+    };
+
+    // Sync to chrome.storage.local so the widget also appears on cross-origin pages
+    await chrome.storage.local.set({ activeTest });
+
+    loadSDK();
+  } catch (e) {
+    // localStorage may be inaccessible on some pages (e.g. chrome:// pages)
   }
 }
 
-// Load the SDK - tries script tag first, falls back to fetch+eval for CSP-blocked sites
+// Ask the background worker to inject and initialize the SDK (bypasses CSP)
 function loadSDK() {
   if (sdkLoaded || !activeTest) return;
+  sdkLoaded = true;
 
-  const sdkUrl = `${activeTest.backendUrl}/sdk/uxtest.min.js`;
-
-  // Try standard script injection first
-  const script = document.createElement('script');
-  script.src = sdkUrl;
-  script.onload = () => {
-    sdkLoaded = true;
-    initSDK();
-  };
-  script.onerror = () => {
-    console.warn('[UXTest Extension] Script tag blocked by CSP. Attempting fetch fallback...');
-    loadSDKViaFetch(sdkUrl);
-  };
-  (document.head || document.documentElement).appendChild(script);
-}
-
-// Fallback: fetch SDK source and inject via chrome.scripting or inline script
-async function loadSDKViaFetch(sdkUrl) {
-  try {
-    const response = await fetch(sdkUrl);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const sdkCode = await response.text();
-
-    // Content scripts run in an isolated world, so we use a blob URL
-    // which is more likely to bypass strict CSP than inline scripts
-    const blob = new Blob([sdkCode], { type: 'application/javascript' });
-    const blobUrl = URL.createObjectURL(blob);
-    const blobScript = document.createElement('script');
-    blobScript.src = blobUrl;
-    blobScript.onload = () => {
-      URL.revokeObjectURL(blobUrl);
-      sdkLoaded = true;
-      initSDK();
-      console.log('[UXTest Extension] SDK loaded via fetch+blob fallback');
-    };
-    blobScript.onerror = () => {
-      URL.revokeObjectURL(blobUrl);
-      // Last resort: eval in page context via window.eval
-      try {
-        const evalScript = document.createElement('script');
-        evalScript.textContent = sdkCode;
-        (document.head || document.documentElement).appendChild(evalScript);
-        sdkLoaded = true;
-        initSDK();
-        console.log('[UXTest Extension] SDK loaded via inline script fallback');
-      } catch(e) {
-        console.error('[UXTest Extension] All SDK loading methods blocked by CSP.',
-          'The target site has strict CSP that blocks all external scripts.', e.message);
-      }
-    };
-    (document.head || document.documentElement).appendChild(blobScript);
-  } catch(e) {
-    console.error('[UXTest Extension] Failed to fetch SDK:', e.message);
-  }
-}
-
-// Initialize the SDK
-function initSDK() {
-  if (!window.UXTest || !activeTest) return;
-
-  window.UXTest.init({
-    projectId: activeTest.projectId,
-    testId: activeTest.id,
-    variant: activeTest.variant,
-    endpoint: activeTest.backendUrl
+  chrome.runtime.sendMessage({ type: 'INJECT_SDK', activeTest }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('[UXTest Extension] Could not reach background worker:', chrome.runtime.lastError.message);
+      sdkLoaded = false;
+      return;
+    }
+    if (!response?.ok) {
+      console.error('[UXTest Extension] SDK injection failed:', response?.error);
+      sdkLoaded = false;
+    }
   });
-
-  console.log('[UXTest Extension] Test started:', activeTest.name);
 }
 
 // Listen for messages from popup
@@ -97,6 +73,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.type === 'STOP_TEST') {
+    // Clear synced active test from storage
+    chrome.storage.local.remove('activeTest');
+
     if (window.UXTest) {
       window.UXTest.abandon('extension_stopped');
     }
@@ -114,3 +93,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Initialize on page load
 checkActiveTest();
+
+// When the SDK signals test completion, clear the stored active test
+window.addEventListener('uxtest:complete', () => {
+  chrome.storage.local.remove('activeTest');
+  activeTest = null;
+  sdkLoaded = false;
+});
+
+// Bridge SDK network requests through the background worker (bypasses page CSP)
+window.addEventListener('__uxtestProxyRequest', function(e) {
+  var detail = e.detail;
+  chrome.runtime.sendMessage(
+    { type: 'PROXY_REQUEST', url: detail.url, method: detail.method, body: detail.body },
+    function(response) {
+      window.dispatchEvent(new CustomEvent('__uxtestProxyResponse', {
+        detail: Object.assign({ id: detail.id }, response || { error: 'No response from background' })
+      }));
+    }
+  );
+});
